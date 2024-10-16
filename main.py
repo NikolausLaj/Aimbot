@@ -91,7 +91,7 @@ def main():
     face_cascade, eye_cascade = load_cascades()
 
     # Open the external webcam (change the index to 1, 2, etc., if needed)
-    cap = cv2.VideoCapture(2)  # Use 2 for the external webcam
+    cap = cv2.VideoCapture(0)  # Use 2 for the external webcam and 0 for build-in camera
 
     if not cap.isOpened():
         print("Error: Could not open webcam.")
