@@ -3,8 +3,7 @@ import cv2
 # Load the Haar cascade files for face and eye detection
 def load_cascades():
     face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-    eye_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_eye.xml')
-    return face_cascade, eye_cascade
+    return face_cascade
 
 # Capture video frame by frame
 def capture_frame(cap):
@@ -14,53 +13,35 @@ def capture_frame(cap):
     return frame
 
 # Detect faces in a frame
-def detect_faces(face_cascade, gray_frame):
-    faces = face_cascade.detectMultiScale(gray_frame, 1.1, 4)
+def detect_faces(face_cascade, gray_frame, scale_factor = 1.1, minNeigbors = 4):
+    faces = face_cascade.detectMultiScale(gray_frame, scale_factor, minNeigbors)
     return faces
 
-# Detect eyes within the region of detected faces
-def detect_eyes(eye_cascade, face_roi_gray):
-    eyes = eye_cascade.detectMultiScale(face_roi_gray)
-    return eyes
-
-def eyes_center(frame, faces, gray_frame, eye_cascade):
-    eyes_center = []
+def compute_rectangle(faces, frame, draw = True, color = (255, 0, 0), thickness = 2):
+    corners = []
     for (x, y, w, h) in faces:
-        cv2.rectangle(frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
+        corner_1 = (x, y)
+        corner_2 = (x + w, y + h)
+        corners.append([corner_1, corner_2])
+        if draw:
+            cv2.rectangle(frame, corner_1, corner_2, color, thickness)
 
-        # Region of interest (ROI) for eyes within the face
-        roi_gray = gray_frame[y:y+h, x:x+w]
-        roi_color = frame[y:y+h, x:x+w]
+    return corners
 
-        # Detect eyes within the face region
-        eyes = detect_eyes(eye_cascade, roi_gray)
-
-        for (ex, ey, ew, eh) in eyes:
-            eye_center = (ex + ew // 2, ey + eh // 2)
-            eyes_center.append(eye_center)
-            cv2.circle(roi_color, eye_center, 5, (0, 0, 255), -1)  # Red dot for eye center
-        
-    return eyes_center
-
-def eyes_midpoint(frame, eyes_center):
-    midpoint = []
-    if len(eyes_center) > 1:
-
-        midpoint = [
-            (eyes_center[0][0] + eyes_center[1][0]) // 2, 
-            (eyes_center[0][1] + eyes_center[1][1]) // 2
-            ]
-    else:
-        if len(eyes_center) == 0:
-            midpoint = [-1, -1]
-        else:
-            midpoint = [eyes_center[0][0], eyes_center[0][1]]
-
-    cv2.circle(frame , midpoint, 5, (0, 255, 0), -1)  # Red dot for eye center
+def compute_midpoint(frame, rectangels, draw = True, radius = 5, color = (0, 0, 255), thickness = -1):
+    midpoints = []
+    for rect in rectangels:
+        x = (rect[0][0] + rect[1][0]) // 2
+        y = (rect[0][1] + rect[1][1]) // 2
+        midpoints.append((x, y))
+        # if draw:
+        cv2.circle(frame, (x,y), radius, color, thickness)  # Red dot for eye center
     
+    return midpoints
+
 
 # Process and display the video stream
-def process_video_stream(cap, face_cascade, eye_cascade):
+def process_video_stream(cap, face_cascade):
     while True:
         # Capture frame-by-frame
         frame = capture_frame(cap)
@@ -71,12 +52,10 @@ def process_video_stream(cap, face_cascade, eye_cascade):
         gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
         # Detect faces
-        faces = detect_faces(face_cascade, gray_frame)
+        faces = detect_faces(face_cascade, gray_frame, 1.1, 7)
 
-        # Draw rectangles around faces and circles at eye centers
-        eyes_position = eyes_center(frame, faces, gray_frame, eye_cascade)
-        eyes_midpoint(frame, eyes_position)
-        
+        rects = compute_rectangle(faces, frame, False)
+        mid = compute_midpoint(frame, rects)
         
         # Display the resulting frame
         cv2.imshow('Face and Eye Tracking', frame)
@@ -88,17 +67,17 @@ def process_video_stream(cap, face_cascade, eye_cascade):
 # Main function to start the program
 def main():
     # Load the cascades for face and eye detection
-    face_cascade, eye_cascade = load_cascades()
+    face_cascade = load_cascades()
 
     # Open the external webcam (change the index to 1, 2, etc., if needed)
-    cap = cv2.VideoCapture(0)  # Use 2 for the external webcam and 0 for build-in camera
+    cap = cv2.VideoCapture(2)  # Use 2 for the external webcam and 0 for build-in camera
 
     if not cap.isOpened():
         print("Error: Could not open webcam.")
         return
 
     # Process the video stream
-    process_video_stream(cap, face_cascade, eye_cascade)
+    process_video_stream(cap, face_cascade)
 
     # Release the webcam and close all OpenCV windows
     cap.release()
