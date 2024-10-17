@@ -12,7 +12,6 @@ def capture_frame(cap):
         return None
     return frame
 
-# Detect faces in a frame
 def detect_faces(face_cascade, gray_frame, scale_factor = 1.1, minNeigbors = 4):
     faces = face_cascade.detectMultiScale(gray_frame, scale_factor, minNeigbors)
     return faces
@@ -34,14 +33,31 @@ def compute_midpoint(frame, rectangels, draw = True, radius = 5, color = (0, 0, 
         x = (rect[0][0] + rect[1][0]) // 2
         y = (rect[0][1] + rect[1][1]) // 2
         midpoints.append((x, y))
-        # if draw:
-        cv2.circle(frame, (x,y), radius, color, thickness)  # Red dot for eye center
+        if draw:
+            cv2.circle(frame, (x,y), radius, color, thickness)  # Red dot for eye center
     
     return midpoints
+
+def compute_error(image_center, face_midpoints, frame, draw = True):
+    errors = []
+    for face_center in face_midpoints:
+        ex = image_center[0] - face_center[0]
+        ey = image_center[1] - face_center[1]
+        errors.append((ex, ey))
+        if draw:
+            print((ex, ey), image_center, face_center)
+            cv2.line(frame, face_center, (ex+face_center[0], ey+face_center[1]), (255, 255, 255), 2)
+    return errors
 
 
 # Process and display the video stream
 def process_video_stream(cap, face_cascade):
+    image_center = (
+        int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) // 2),
+        int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) // 2)
+        )
+
+    
     while True:
         # Capture frame-by-frame
         frame = capture_frame(cap)
@@ -53,12 +69,15 @@ def process_video_stream(cap, face_cascade):
 
         # Detect faces
         faces = detect_faces(face_cascade, gray_frame, 1.1, 7)
-
         rects = compute_rectangle(faces, frame, False)
-        mid = compute_midpoint(frame, rects)
+        face_midpoints = compute_midpoint(frame, rects, color=(0,255,0))
+        error = compute_error(image_center, face_midpoints, frame)
+        cv2.circle(frame, image_center, 5, (0,0,255), -1)  # Red dot for eye center
+ 
         
         # Display the resulting frame
-        cv2.imshow('Face and Eye Tracking', frame)
+        flipped_frame = cv2.flip(frame, 1)
+        cv2.imshow('Face and Eye Tracking', flipped_frame)
 
         # Break the loop on 'q' key press
         if cv2.waitKey(1) & 0xFF == ord('q'):
@@ -70,7 +89,7 @@ def main():
     face_cascade = load_cascades()
 
     # Open the external webcam (change the index to 1, 2, etc., if needed)
-    cap = cv2.VideoCapture(2)  # Use 2 for the external webcam and 0 for build-in camera
+    cap = cv2.VideoCapture(0)  # Use 2 for the external webcam and 0 for build-in camera
 
     if not cap.isOpened():
         print("Error: Could not open webcam.")
